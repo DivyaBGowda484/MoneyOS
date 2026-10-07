@@ -1,0 +1,281 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// CORE & AUTHENTICATION
+// -------------------------------------------------------------
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  passwordHash  String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  categories        Category[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  recurringRules    RecurringTransaction[]
+  salaryPlans       SalaryPlan[]
+  investments       Investment[]
+  goals             Goal[]
+  wishlistItems     WishlistItem[]
+  familyMembers     FamilyMember[]
+  ipoApplications   IpoApplication[]
+}
+
+model Account {
+  id             String        @id @default(cuid())
+  userId         String
+  name           String        // e.g., "HDFC Salary", "ICICI Savings", "Cash", "Cred Card"
+  type           String        // SAVINGS, CURRENT, CREDIT_CARD, WALLET, CASH
+  balance        Float         @default(0.0)
+  accountNumber  String?       // optional last 4 digits
+  color          String?       // Hex or Carbon token
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionsFrom      Transaction[]          @relation("FromAccount")
+  transactionsTo        Transaction[]          @relation("ToAccount")
+  salaryAllocations     SalaryAllocation[]
+  recurringTransactions RecurringTransaction[]
+  investments           Investment[]
+}
+
+model Category {
+  id        String       @id @default(cuid())
+  userId    String
+  name      String       // e.g., "Food & Dining", "Rent", "Groceries", "Salary"
+  type      String       // EXPENSE, INCOME
+  icon      String?      // Carbon icon key
+  color     String?
+  isDefault Boolean      @default(false)
+
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions          Transaction[]
+  budgets               Budget[]
+  recurringTransactions RecurringTransaction[]
+}
+
+// -------------------------------------------------------------
+// PART 1: EXPENSE TRACKER & TRANSACTIONS
+// -------------------------------------------------------------
+model Transaction {
+  id              String            @id @default(cuid())
+  userId          String
+  type            String            // EXPENSE, INCOME, TRANSFER
+  amount          Float
+  description     String            // e.g. "swiggy dinner"
+  date            DateTime          @default(now())
+  
+  fromAccountId   String?
+  toAccountId     String?           // Used for TRANSFER
+  categoryId      String?
+  
+  source          String            @default("MANUAL") // MANUAL, NLP_TEXT, VOICE, OCR_BILL
+  receiptUrl      String?           // Attached invoice/receipt data/url
+  isRecurring     Boolean           @default(false)
+  recurringId     String?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccount     Account?              @relation("FromAccount", fields: [fromAccountId], references: [id], onDelete: SetNull)
+  toAccount       Account?              @relation("ToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+  category        Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  recurringRule   RecurringTransaction? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([userId, categoryId])
+  @@index([userId, fromAccountId])
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String
+  categoryId  String
+  amount      Float
+  month       Int      // 1 - 12
+  year        Int      // e.g. 2026
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId, month, year])
+}
+
+model RecurringTransaction {
+  id              String            @id @default(cuid())
+  userId          String
+  type            String            // EXPENSE, INCOME, TRANSFER
+  amount          Float
+  description     String
+  frequency       String            // DAILY, WEEKLY, MONTHLY, YEARLY
+  interval        Int               @default(1)
+  startDate       DateTime
+  endDate         DateTime?
+  lastProcessedAt DateTime?
+  nextRunDate     DateTime
+  isActive        Boolean           @default(true)
+  
+  fromAccountId   String?
+  categoryId      String?
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccount     Account?          @relation(fields: [fromAccountId], references: [id], onDelete: SetNull)
+  category        Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions    Transaction[]
+}
+
+// -------------------------------------------------------------
+// PART 2: MONTHLY SALARY PLANNER
+// -------------------------------------------------------------
+model SalaryPlan {
+  id            String             @id @default(cuid())
+  userId        String
+  month         Int                // 1 - 12
+  year          Int                // e.g. 2026
+  salaryAmount  Float
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allocations   SalaryAllocation[]
+
+  @@unique([userId, month, year])
+}
+
+model SalaryAllocation {
+  id              String      @id @default(cuid())
+  salaryPlanId    String
+  purpose         String      // e.g. "Rent", "Emergency Fund", "Mutual Funds"
+  amount          Float
+  targetAccountId String?
+  isDone          Boolean     @default(false)
+  orderIndex      Int         @default(0)
+  completedAt     DateTime?
+
+  salaryPlan      SalaryPlan  @relation(fields: [salaryPlanId], references: [id], onDelete: Cascade)
+  targetAccount   Account?    @relation(fields: [targetAccountId], references: [id], onDelete: SetNull)
+}
+
+// -------------------------------------------------------------
+// PART 3: INVESTMENTS & GOALS
+// -------------------------------------------------------------
+model Investment {
+  id             String         @id @default(cuid())
+  userId         String
+  name           String         // e.g., "Parag Parikh Flexi Cap", "Nifty 50 ETF"
+  savingType     String?        // e.g., "Cash", "FD", "Emergency Fund", "Equity MF", "Retirement MF", "Individual Stocks", "Short Term Savings", "Mid Term Savings", "Long Term Savings", "Gold ETF", "Family"
+  type           String         // MUTUAL_FUND, STOCKS, FD_RD, GOLD, REAL_ESTATE, CRYPTO, EPF_PPF, NPS, OTHER
+  investedAmount Float
+  currentValue   Float
+  accountId      String?
+  notes          String?
+  goalId         String?
+  orderIndex     Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account        Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  goal           Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
+}
+
+model Goal {
+  id                  String       @id @default(cuid())
+  userId              String
+  title               String       // e.g. "Hyundai Creta", "Europe Vacation", "House Downpayment"
+  category            String       // CAR, BIKE, TRIP, HOME, EDUCATION, RETIREMENT, OTHER
+  targetCost          Float
+  targetDate          DateTime
+  downPaymentPercent  Float?       // optional, e.g. 20.0 – null means no loan/DP split
+  expectedLoanTenure  Int?         // in months
+  expectedInterestRate Float?      // e.g. 8.5%
+  currentSavedAmount  Float?       @default(0) // manually entered saved amount
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedInvestments   Investment[]
+}
+
+model WishlistItem {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  targetPrice Float?
+  rationale   String?
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  isFulfilled Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------------------------------------
+// PART 4: IPO TRACKER
+// -------------------------------------------------------------
+model FamilyMember {
+  id            String           @id @default(cuid())
+  userId        String
+  name          String           // e.g., "Self", "Dad", "Mom"
+  pan           String?
+  upiId         String?
+  relation      String?
+  createdAt     DateTime         @default(now())
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications  IpoApplication[]
+  fundTransfers FamilyFundLedger[]
+}
+
+model IpoApplication {
+  id                String            @id @default(cuid())
+  userId            String
+  familyMemberId    String
+  companyName       String
+  symbol            String?
+  lotsApplied       Int               @default(1)
+  sharesPerLot      Int               @default(1)
+  bidPrice          Float
+  totalBlocked      Float
+  
+  status            String            @default("APPLIED") // APPLIED, ALLOTTED, NOT_ALLOTTED, CANCELLED
+  allottedLots      Int               @default(0)
+  refundStatus      String            @default("PENDING") // PENDING, REFUNDED, NOT_APPLICABLE
+  refundDate        DateTime?
+  
+  sellPricePerShare Float?
+  totalRealized     Float?
+  realizedPnL       Float?
+  soldDate          DateTime?
+
+  appliedAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyMember      FamilyMember      @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+}
+
+model FamilyFundLedger {
+  id             String       @id @default(cuid())
+  familyMemberId String
+  amountReceived Float        @default(0.0)
+  amountReturned Float        @default(0.0)
+  notes          String?
+  date           DateTime     @default(now())
+
+  familyMember   FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+}

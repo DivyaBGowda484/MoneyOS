@@ -1,0 +1,43 @@
+{
+  "name": "moneyos",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "export DATABASE_URL=\"file:./dev.db\" NEXTAUTH_SECRET=\"moneyos-super-secret-key-inr-2026-production\" NEXTAUTH_URL=\"http://localhost:3000\" && next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "node --loader ts-node/esm prisma/seed.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@carbon/colors": "^11.23.0",
+    "@carbon/icons-react": "^11.51.0",
+    "@carbon/react": "^1.64.0",
+    "@carbon/styles": "^1.64.0",
+    "@prisma/client": "^5.19.1",
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^3.6.0",
+    "next": "14.2.5",
+    "next-auth": "^4.24.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sass": "^1.77.8",
+    "tesseract.js": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "prisma": "^5.19.1",
+    "tailwindcss": "^3.4.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

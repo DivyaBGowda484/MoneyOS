@@ -1,0 +1,16 @@
+{
+  "name": "MoneyOS",
+  "short_name": "MoneyOS",
+  "description": "Smart Personal Finance & Expense Tracker for India",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#161616",
+  "theme_color": "#0f62fe",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
